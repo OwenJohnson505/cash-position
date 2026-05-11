@@ -401,16 +401,21 @@ table.dash tr.totals td { background: #233149 !important; font-weight: 600; }
           <div class="card-h"><h3>Users</h3></div>
           <div id="users-list" class="muted tiny">Loading…</div>
           <div style="margin-top:14px;padding-top:12px;border-top:1px solid #1e293b;">
-            <div class="section-h" style="margin-top:0;">Invite user</div>
+            <div class="section-h" style="margin-top:0;">Add user</div>
             <div class="row" style="gap:8px;flex-wrap:wrap;">
               <input id="invite-email" type="email" placeholder="email@cal.delivery" style="flex:1;min-width:180px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:7px 10px;border-radius:7px;font-size:13px;" />
+              <div style="display:flex;gap:4px;align-items:center;">
+                <input id="invite-password" type="text" placeholder="password" style="width:140px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:7px 10px;border-radius:7px;font-size:13px;" />
+                <button id="gen-pw-btn" type="button" style="background:#334155;color:#94a3b8;border:none;padding:7px 8px;border-radius:7px;font-size:14px;cursor:pointer;line-height:1;" title="Generate random password">&#x1f3b2;</button>
+              </div>
               <select id="invite-role" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:7px 10px;border-radius:7px;font-size:13px;">
                 <option value="user">Read only</option>
                 <option value="admin">Admin</option>
               </select>
-              <button id="invite-btn" style="background:#3b82f6;color:white;border:none;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;">Send invite</button>
+              <button id="invite-btn" style="background:#3b82f6;color:white;border:none;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;">Create user</button>
             </div>
-            <div class="meta tiny" style="margin-top:6px;">Sends a magic link. The chosen role is applied automatically the first time they sign in.</div>
+            <div id="invite-result" style="display:none;margin-top:8px;padding:10px 14px;background:#064e3b;border:1px solid #065f46;border-radius:7px;font-size:13px;color:#6ee7b7;"></div>
+            <div class="meta tiny" style="margin-top:6px;">Creates the account instantly with a password. Share the credentials with the user — they can log in straight away.</div>
           </div>
         </div>
       </div>
@@ -654,6 +659,7 @@ function bindUI() {
     document.getElementById('save-manual').onclick = saveManualEntries;
     document.getElementById('ignored-add').onclick = addIgnoredSupplier;
     document.getElementById('invite-btn').onclick = inviteUser;
+    document.getElementById('gen-pw-btn').onclick = () => { document.getElementById('invite-password').value = generatePassword(10); };
     const sd = document.getElementById('snapshot-date');
     sd.onchange = onSnapshotDateChange;
   }
@@ -1457,19 +1463,66 @@ async function toggleUserRole(userId, newRole) {
   await renderUsersList();
 }
 
+function generatePassword(len) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let pw = '';
+  const arr = new Uint8Array(len || 10);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < arr.length; i++) pw += chars[arr[i] % chars.length];
+  return pw;
+}
+
 async function inviteUser() {
   const email = (document.getElementById('invite-email').value || '').trim();
+  const password = (document.getElementById('invite-password').value || '').trim();
   const role  = document.getElementById('invite-role').value;
   if (!email) { toast('Enter an email', 'error'); return; }
+  if (!password || password.length < 6) { toast('Password must be at least 6 characters', 'error'); return; }
+
   const btn = document.getElementById('invite-btn');
-  btn.disabled = true; btn.textContent = 'Sending…';
+  btn.disabled = true; btn.textContent = 'Creating…';
+  const resultDiv = document.getElementById('invite-result');
+  resultDiv.style.display = 'none';
+
+  // Save the current admin session so we can restore it after signUp
+  const { data: { session: adminSession } } = await sb.auth.getSession();
+
+  // Create the new user account via signUp
+  const { data, error } = await sb.auth.signUp({ email, password });
+
+  if (error) {
+    btn.disabled = false; btn.textContent = 'Create user';
+    toast(error.message, 'error');
+    // Restore admin session
+    if (adminSession) await sb.auth.setSession({ access_token: adminSession.access_token, refresh_token: adminSession.refresh_token });
+    return;
+  }
+
+  // Restore admin session immediately (signUp may have switched the active session)
+  if (adminSession) {
+    await sb.auth.setSession({ access_token: adminSession.access_token, refresh_token: adminSession.refresh_token });
+  }
+
   // Record the desired role for when their profile gets auto-created on first sign in
   await sb.from('pending_invites').upsert({ email: email.toLowerCase(), role, invited_by: state.user.id }, { onConflict: 'email' });
-  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: window.location.href } });
-  btn.disabled = false; btn.textContent = 'Send invite';
-  if (error) { toast(error.message, 'error'); return; }
+
+  // Also try to set the role directly in profiles (if the profile was auto-created by trigger)
+  const userId = data.user ? data.user.id : null;
+  if (userId) {
+    await sb.from('profiles').upsert({ id: userId, email: email.toLowerCase(), role }, { onConflict: 'id' });
+  }
+
+  btn.disabled = false; btn.textContent = 'Create user';
+
+  // Show credentials for the admin to share
+  resultDiv.innerHTML = '<strong>Account created!</strong> Share these credentials:<br><br>' +
+    '<span style="color:#e2e8f0;">Email:</span> <code style="background:#1e293b;padding:2px 6px;border-radius:4px;user-select:all;">' + email + '</code><br>' +
+    '<span style="color:#e2e8f0;">Password:</span> <code style="background:#1e293b;padding:2px 6px;border-radius:4px;user-select:all;">' + password + '</code>';
+  resultDiv.style.display = 'block';
+
   document.getElementById('invite-email').value = '';
-  toast('Magic link sent to ' + email, 'ok');
+  document.getElementById('invite-password').value = '';
+  toast('User ' + email + ' created', 'ok');
   await renderUsersList();
 }
 
