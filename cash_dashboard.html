@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f172a" />
+<title>Cash Position Dashboard</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; min-height: 100dvh; }
+
+a { color: #3b82f6; }
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea, button { font-family: inherit; }
+input, select, textarea { font-size: 16px; }
+
+/* ---------- LOGIN ---------- */
+#login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; min-height: 100dvh; padding: 24px; }
+#login-card { background: #1e293b; border: 1px solid #334155; border-radius: 14px; padding: 28px; width: 100%; max-width: 360px; }
+#login-card h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+#login-card .sub { color: #94a3b8; font-size: 13px; margin: 0 0 20px; }
+#login-card label { display: block; font-size: 12px; color: #94a3b8; margin: 14px 0 6px; }
+#login-card input { width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 10px 12px; border-radius: 8px; outline: none; }
+#login-card input:focus { border-color: #3b82f6; }
+#login-card button { width: 100%; background: #3b82f6; color: white; border: none; padding: 11px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 18px; }
+#login-card button:disabled { background: #475569; cursor: not-allowed; }
+#login-status { font-size: 13px; margin-top: 14px; min-height: 18px; color: #94a3b8; }
+#login-status.error { color: #f87171; }
+
+/* ---------- APP SHELL ---------- */
+#app { display: none; }
+#app.ready { display: block; }
+
+header.app-header {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: saturate(140%) blur(8px);
+  -webkit-backdrop-filter: saturate(140%) blur(8px);
+  border-bottom: 1px solid #1e293b;
+  padding: 12px 18px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  display: flex; align-items: center; gap: 14px;
+}
+header.app-header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; min-width: 0; }
+header.app-header .sub { color: #94a3b8; font-size: 12px; }
+header.app-header .right { display: flex; align-items: center; gap: 10px; }
+header.app-header .userpill { background: #1e293b; border: 1px solid #334155; padding: 5px 10px; border-radius: 16px; font-size: 12px; color: #cbd5e1; }
+header.app-header .signout { background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 6px 10px; border-radius: 8px; font-size: 12px; }
+header.app-header .signout:hover { color: #e2e8f0; border-color: #475569; }
+
+/* ---------- TAB NAV ---------- */
+nav.tabs {
+  position: sticky; top: 56px; z-index: 49;
+  background: #0f172a; border-bottom: 1px solid #1e293b;
+  display: flex; gap: 2px; padding: 0 12px; overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+nav.tabs button {
+  background: transparent; border: none; color: #94a3b8;
+  padding: 12px 14px; font-size: 13px; font-weight: 500;
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+nav.tabs button:hover { color: #e2e8f0; }
+nav.tabs button.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+/* ---------- HAMBURGER MENU (mobile) ---------- */
+.hamburger { display: none; background: transparent; border: 1px solid #334155; color: #cbd5e1; padding: 6px 9px; border-radius: 8px; }
+@media (max-width: 720px) {
+  .hamburger { display: inline-flex; }
+  nav.tabs { display: none; flex-direction: column; align-items: stretch; padding: 8px; }
+  nav.tabs.open { display: flex; }
+  nav.tabs button { text-align: left; border-bottom: 1px solid #1e293b; border-left: 2px solid transparent; }
+  nav.tabs button.active { border-bottom-color: #1e293b; border-left-color: #3b82f6; }
+}
+
+/* ---------- FILTER ROW ---------- */
+.filter-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 18px; border-bottom: 1px solid #1e293b;
+}
+.filter-row label { font-size: 12px; color: #94a3b8; }
+.filter-row select, .filter-row input {
+  background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+  padding: 7px 10px; border-radius: 7px; font-size: 13px; outline: none;
+}
+.filter-row select:focus, .filter-row input:focus { border-color: #3b82f6; }
+.filter-row .spacer { flex: 1; }
+.filter-row .meta { color: #64748b; font-size: 12px; }
+
+/* ---------- MAIN CONTENT ---------- */
+main { padding: 18px; max-width: 1400px; margin: 0 auto; }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ---------- CARDS / KPI ---------- */
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+.card-h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card-h h3 { font-size: 14px; font-weight: 600; margin: 0; flex: 1; }
+.card-h .meta { font-size: 11px; color: #64748b; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px 16px; }
+.kpi .label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.kpi .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kpi .change { font-size: 12px; margin-top: 4px; font-variant-numeric: tabular-nums; color: #94a3b8; }
+.kpi .change.up { color: #34d399; }
+.kpi .change.down { color: #f87171; }
+.kpi .spark { width: 100%; height: 28px; margin-top: 8px; opacity: 0.85; }
+
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+
+/* ---------- TABLES ---------- */
+.table-wrap { overflow-x: auto; }
+table.dash { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
+table.dash thead th {
+  position: sticky; top: 0;
+  background: #1e293b; color: #94a3b8;
+  text-align: left; padding: 9px 12px;
+  font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid #334155;
+}
+table.dash tbody td { padding: 8px 12px; border-bottom: 1px solid #1e293b; vertical-align: top; font-variant-numeric: tabular-nums; }
+table.dash tbody tr:nth-child(odd) td { background: #182234; }
+table.dash tbody tr:hover td { background: #233149; }
+table.dash td.num, table.dash th.num { text-align: right; }
+table.dash tr.totals td { background: #233149 !important; font-weight: 600; }
+.delta { font-size: 11px; color: #64748b; }
+.delta.up { color: #34d399; }
+.delta.down { color: #f87171; }
+
+/* ---------- BADGES / CHIPS ---------- */
+.chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+.chip.warn { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.chip.danger { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.chip.ok { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.chip.info { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+
+/* ---------- ALERTS ---------- */
+.alert-list { list-style: none; padding: 0; margin: 0; }
+.alert-list li { padding: 10px 0; border-bottom: 1px dashed #334155; display: flex; gap: 10px; align-items: flex-start; }
+.alert-list li:last-child { border-bottom: none; }
+
+/* ---------- ATTRIBUTION ---------- */
+.attribution { list-style: none; padding: 0; margin: 0; }
+.attribution li { padding: 8px 0; border-top: 1px dashed #334155; display: grid; grid-template-columns: 80px 140px 1fr; gap: 10px; align-items: baseline; font-size: 13px; }
+.attribution li:first-child { border-top: none; }
+.attribution .amt { font-variant-numeric: tabular-nums; font-weight: 500; }
+.attribution .amt.neg { color: #f87171; }
+.attribution .amt.pos { color: #34d399; }
+.attribution .ent { color: #94a3b8; font-size: 12px; }
+
+/* ---------- UPLOAD AREA ---------- */
+.upload-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #1e293b; }
+.upload-row .name { flex: 1; font-size: 13px; }
+.upload-row .when { font-size: 11px; color: #64748b; }
+.upload-row .icon { width: 18px; }
+.upload-row button { background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 7px; font-size: 12px; }
+
+/* ---------- FORMS ---------- */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.form-grid label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+.form-grid input { width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 7px 10px; border-radius: 7px; font-size: 13px; }
+.form-grid input:focus { border-color: #3b82f6; outline: none; }
+.section-h { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin: 18px 0 10px; }
+
+/* ---------- UTILITY ---------- */
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #334155; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.muted { color: #94a3b8; }
+.tiny { font-size: 11px; }
+.right { text-align: right; }
+.hidden { display: none !important; }
+.row { display: flex; gap: 12px; align-items: center; }
+.toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; border: 1px solid #334155; padding: 10px 14px; border-radius: 8px; font-size: 13px; z-index: 100; }
+.toast.error { border-color: #f87171; color: #fecaca; }
+.toast.ok { border-color: #34d399; color: #bbf7d0; }
+</style>
+</head>
+<body>
+
+<!-- ======================= LOGIN ======================= -->
+<div id="login-screen">
+  <div id="login-card">
+    <h1>Cash position</h1>
+    <p class="sub">Sign in to continue</p>
+    <form id="login-form" action="javascript:void(0)" onsubmit="doLogin();return false;">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" inputmode="email" enterkeyhint="next" required />
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" enterkeyhint="go" required />
+      <button id="login-btn" type="submit">Sign in</button>
+      <div id="login-status"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ======================= APP ======================= -->
+<div id="app">
+  <header class="app-header">
+    <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+    <h1>Cash position <span class="sub" id="header-week"></span></h1>
+    <div class="right">
+      <span class="userpill" id="userpill"></span>
+      <button class="signout" id="signout-btn">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabnav">
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="cash-position">Cash position</button>
+    <button data-tab="ar-funding">AR &amp; funding</button>
+    <button data-tab="ap-liabilities">AP &amp; liabilities</button>
+    <button data-tab="cash-flow">Cash flow</button>
+    <button data-tab="admin" class="admin-only">Admin</button>
+  </nav>
+
+  <div class="filter-row">
+    <label for="week-select">Week</label>
+    <select id="week-select"></select>
+    <label for="entity-select">Entity</label>
+    <select id="entity-select">
+      <option value="all">All entities</option>
+    </select>
+    <span class="spacer"></span>
+    <span class="meta" id="compare-meta"></span>
+  </div>
+
+  <main>
+    <!-- ========== OVERVIEW ========== -->
+    <section id="tab-overview" class="tab-content active">
+      <div class="kpi-grid" id="overview-kpis"></div>
+
+      <div class="card">
+        <div class="card-h">
+          <h3>What changed this week</h3>
+          <span class="meta" id="attribution-meta">auto-surfaced, ≥ £3k, excl. driver COS</span>
+        </div>
+        <ul class="attribution" id="attribution-list"><li class="muted tiny">Loading…</li></ul>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h3>12-week cash trend by entity</h3></div>
+        <div style="position: relative; height: 240px;"><canvas id="trendChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h3>Alerts</h3><span class="meta" id="alerts-count"></span></div>
+        <ul class="alert-list" id="alerts-list"><li class="muted tiny">Loading…</li></ul>
+      </div>
+    </section>
+
+    <!-- ========== CASH POSITION ========== -->
+    <section id="tab-cash-position" class="tab-content">
+      <div class="card">
+        <div class="card-h"><h3>Balances by account, by entity</h3><span class="meta">deltas vs. previous week</span></div>
+        <div class="table-wrap">
+          <table class="dash" id="position-table">
+            <thead><tr>
+              <th>Account</th>
+              <th class="num">Cal Sameday</th>
+              <th class="num">C&amp;L</th>
+              <th class="num">Cal South</th>
+              <th class="num">Total</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Cross-billing matrix</h3><span class="meta">outstanding intercompany invoices</span></div>
+        <div class="table-wrap">
+          <table class="dash" id="cross-billing-table">
+            <thead><tr>
+              <th>From → To</th>
+              <th class="num">Cal Sameday</th>
+              <th class="num">C&amp;L</th>
+              <th class="num">Cal South</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== AR & FUNDING ========== -->
+    <section id="tab-ar-funding" class="tab-content">
+      <div class="kpi-grid" id="ar-kpis"></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-h"><h3>Overdue ageing by entity</h3></div>
+          <div style="position: relative; height: 220px;"><canvas id="ageChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>Skipton facility utilisation</h3></div>
+          <div id="facility-utilisation"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Top overdue customers</h3></div>
+        <div class="table-wrap">
+          <table class="dash" id="top-overdue-table">
+            <thead><tr><th>Customer</th><th>Entity</th><th class="num">Outstanding</th><th class="num">Days</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== AP & LIABILITIES ========== -->
+    <section id="tab-ap-liabilities" class="tab-content">
+      <div class="kpi-grid" id="ap-kpis"></div>
+      <div class="card">
+        <div class="card-h"><h3>Liabilities by category, by entity</h3></div>
+        <div style="position: relative; height: 240px;"><canvas id="liabChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Top suppliers (Clearbooks outstanding)</h3></div>
+        <div class="table-wrap">
+          <table class="dash" id="top-suppliers-table">
+            <thead><tr><th>Supplier</th><th>Entity</th><th class="num">Outstanding</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Due to be paid next week</h3></div>
+        <div class="grid-3" id="due-next-week-grid"></div>
+      </div>
+    </section>
+
+    <!-- ========== CASH FLOW ========== -->
+    <section id="tab-cash-flow" class="tab-content">
+      <div class="kpi-grid" id="cf-kpis"></div>
+      <div class="card">
+        <div class="card-h"><h3>Actuals + forecast</h3><span class="meta">12 weeks back, 18 weeks forward</span></div>
+        <div style="position: relative; height: 280px;"><canvas id="cfChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Notes pinned to forecast weeks</h3></div>
+        <ul class="alert-list" id="forecast-notes"></ul>
+      </div>
+    </section>
+
+    <!-- ========== ADMIN ========== -->
+    <section id="tab-admin" class="tab-content">
+      <div class="card">
+        <div class="card-h"><h3>Snapshot date</h3><span class="meta">all uploads &amp; manual entries attach to the Friday of this ISO week</span></div>
+        <div class="row">
+          <input type="date" id="snapshot-date" />
+          <span class="meta" id="snapshot-week-label"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h3>Weekly ledger upload</h3><span class="meta" id="upload-progress"></span></div>
+        <div id="upload-checklist"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h3>Manual entries</h3><span class="meta">Week <span id="manual-week-label"></span> · <span id="manual-last-saved"></span></span></div>
+
+        <div class="section-h">Bank balances — Cal Sameday</div>
+        <div class="form-grid" data-entity="cal_sameday" data-section="banks"></div>
+
+        <div class="section-h">Bank balances — Courier &amp; Logistics</div>
+        <div class="form-grid" data-entity="courier_logistics" data-section="banks"></div>
+
+        <div class="section-h">Bank balances — Cal South</div>
+        <div class="form-grid" data-entity="cal_south" data-section="banks"></div>
+
+        <div class="section-h">Skipton — Courier &amp; Logistics</div>
+        <div class="form-grid" data-entity="courier_logistics" data-section="skipton"></div>
+
+        <div class="section-h">Skipton — Cal South</div>
+        <div class="form-grid" data-entity="cal_south" data-section="skipton"></div>
+
+        <div class="section-h">Future liabilities, tax accruals &amp; due next week</div>
+        <div id="liabilities-form"></div>
+
+        <div class="row" style="margin-top: 18px;">
+          <button id="save-manual" style="background:#3b82f6;color:white;border:none;padding:10px 18px;border-radius:8px;font-weight:600;font-size:13px;">Save manual entries</button>
+          <span class="meta" id="save-status"></span>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-h"><h3>Ignored suppliers</h3><span class="meta">suppress &gt; £3k movement alerts</span></div>
+          <div id="ignored-list"></div>
+          <div class="row" style="margin-top: 12px;">
+            <select id="ignored-entity-select"></select>
+            <input id="ignored-supplier-input" placeholder="Supplier name" style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:7px 10px;border-radius:7px;" />
+            <button id="ignored-add" style="background:#3b82f6;color:white;border:none;padding:7px 12px;border-radius:7px;font-size:12px;">Add</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><h3>Users</h3></div>
+          <div id="users-list" class="muted tiny">Loading…</div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid #1e293b;">
+            <div class="section-h" style="margin-top:0;">Invite user</div>
+            <div class="row" style="gap:8px;flex-wrap:wrap;">
+              <input id="invite-email" type="email" placeholder="email@cal.delivery" style="flex:1;min-width:180px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:7px 10px;border-radius:7px;font-size:13px;" />
+              <select id="invite-role" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:7px 10px;border-radius:7px;font-size:13px;">
+                <option value="user">Read only</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button id="invite-btn" style="background:#3b82f6;color:white;border:none;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;">Send invite</button>
+            </div>
+            <div class="meta tiny" style="margin-top:6px;">Sends a magic link. The chosen role is applied automatically the first time they sign in.</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <div id="toast-container"></div>
+</div>
+
+<!-- ======================= LIBS ======================= -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<script>
+/* =====================================================================
+ *  CONFIG — fill in your Supabase project values
+ * =================================================================== */
+const SB_URL = 'https://xgwpignjpwyeaynmccvy.supabase.co';
+const SB_KEY = 'sb_publishable_aa-oDyUybob0mh5HvPG18A_QF7gpEZE';   // publishable key — safe to embed, RLS protects data
+
+/* =====================================================================
+ *  STORAGE / SUPABASE CLIENT
+ * =================================================================== */
+let _storageOK = false;
+try { localStorage.setItem('_t','1'); localStorage.removeItem('_t'); _storageOK = true; } catch (e) {}
+
+const sb = window.supabase.createClient(SB_URL, SB_KEY, _storageOK ? {} : {
+  auth: {
+    persistSession: false,
+    storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+  }
+});
+
+/* =====================================================================
+ *  STATE
+ * =================================================================== */
+const state = {
+  user: null,
+  profile: null,
+  weeks: [],
+  entities: [],
+  weekId: null,
+  prevWeekId: null,
+  entityFilter: 'all',
+  charts: {},
+};
+
+const ENTITIES_FALLBACK = [
+  { id: 'cal_sameday',       display_name: 'Cal Sameday',         main_bank_name: 'Co-op',   sort_order: 1 },
+  { id: 'courier_logistics', display_name: 'Courier & Logistics', main_bank_name: 'Zempler', sort_order: 2 },
+  { id: 'cal_south',         display_name: 'Cal South',           main_bank_name: 'Tide',    sort_order: 3 },
+];
+
+const BANK_TYPES = [
+  { key: 'main_bank',     label: 'Main bank' },
+  { key: 'wise',          label: 'Wise' },
+  { key: 'flagstone',     label: 'Flagstone' },
+  { key: 'invest_engine', label: 'Invest Engine' },
+  { key: 'natwest',       label: 'Natwest' },
+];
+
+const SKIPTON_FIELDS = [
+  { key: 'skipton_balance',      label: 'Balance' },
+  { key: 'skipton_availability', label: 'Availability' },
+  { key: 'skipton_in_transit',   label: 'In transit' },
+];
+
+const LIABILITY_FIELDS = [
+  { key: 'car_finance',      label: 'Car finance' },
+  { key: 'lease_agreements', label: 'Lease agreements' },
+  { key: 'vat_accrual',      label: 'VAT accrual' },
+  { key: 'ct_accrual',       label: 'CT accrual' },
+  { key: 'driver_run',       label: 'Driver run (next wk)' },
+  { key: 'ccc',              label: 'CCC' },
+  { key: 'salary',           label: 'Salary' },
+  { key: 'pension',          label: 'Pension' },
+  { key: 'ni',               label: 'NI' },
+  { key: 'other',            label: 'Other' },
+];
+
+/* =====================================================================
+ *  UTIL
+ * =================================================================== */
+const fmt = {
+  gbp: v => v == null || isNaN(v) ? '—' : '£' + Math.round(Number(v)).toLocaleString('en-GB'),
+  gbpK: v => v == null || isNaN(v) ? '—' : '£' + Math.round(Number(v)/1000).toLocaleString('en-GB') + 'k',
+  delta: v => {
+    if (v == null || isNaN(v) || v === 0) return '—';
+    const sign = v > 0 ? '+' : '−';
+    return sign + '£' + Math.round(Math.abs(Number(v))).toLocaleString('en-GB');
+  },
+  pct: v => v == null || isNaN(v) ? '' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%',
+};
+
+function deltaClass(v) { return v > 0 ? 'up' : (v < 0 ? 'down' : ''); }
+function isoWeekId(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+}
+
+function toast(msg, kind = 'ok') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+function destroyChart(name) {
+  if (state.charts[name]) { state.charts[name].destroy(); delete state.charts[name]; }
+}
+
+/* =====================================================================
+ *  AUTH
+ * =================================================================== */
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  const status = document.getElementById('login-status');
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if (!email || !password) return;
+
+  btn.disabled = true;
+  status.classList.remove('error');
+  status.textContent = 'Connecting…';
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    status.textContent = 'Loading profile…';
+    state.user = data.user;
+    await loadProfile();
+    await bootApp();
+  } catch (e) {
+    btn.disabled = false;
+    status.classList.add('error');
+    status.textContent = e.message || 'Sign in failed';
+  }
+}
+
+async function loadProfile() {
+  const { data, error } = await sb.from('profiles').select('*').eq('id', state.user.id).maybeSingle();
+  if (error) throw error;
+  state.profile = data || { role: 'user' };
+}
+
+async function trySession() {
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data && data.session) {
+      state.user = data.session.user;
+      await loadProfile();
+      await bootApp();
+    }
+  } catch (e) { /* iOS private browsing tolerated */ }
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+/* =====================================================================
+ *  BOOTSTRAP
+ * =================================================================== */
+async function bootApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('ready');
+
+  document.getElementById('userpill').textContent = state.user.email;
+  if (state.profile.role !== 'admin') {
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+  }
+
+  await loadEntities();
+  await loadWeeks();
+  bindUI();
+  await refreshAll();
+}
+
+async function loadEntities() {
+  const { data, error } = await sb.from('entities').select('*').order('sort_order');
+  if (error || !data || data.length === 0) {
+    state.entities = ENTITIES_FALLBACK;
+  } else {
+    state.entities = data;
+  }
+  const sel = document.getElementById('entity-select');
+  sel.innerHTML = '<option value="all">All entities</option>' +
+    state.entities.map(e => `<option value="${e.id}">${e.display_name}</option>`).join('');
+
+  const ignSel = document.getElementById('ignored-entity-select');
+  if (ignSel) {
+    ignSel.innerHTML = state.entities.map(e => `<option value="${e.id}">${e.display_name}</option>`).join('');
+  }
+}
+
+async function loadWeeks() {
+  const { data, error } = await sb.from('weeks').select('*').order('friday_date', { ascending: false }).limit(60);
+  state.weeks = (error || !data) ? [] : data;
+  const sel = document.getElementById('week-select');
+  sel.innerHTML = state.weeks.map(w => `<option value="${w.week_id}">${w.week_id} (${w.friday_date})</option>`).join('');
+  if (state.weeks.length > 0) {
+    state.weekId = state.weeks[0].week_id;
+    state.prevWeekId = state.weeks[1] ? state.weeks[1].week_id : null;
+    sel.value = state.weekId;
+    document.getElementById('header-week').textContent = '· ' + state.weekId;
+    document.getElementById('compare-meta').textContent = state.prevWeekId ? 'vs. ' + state.prevWeekId : '';
+    const ml = document.getElementById('manual-week-label');
+    if (ml) ml.textContent = state.weekId;
+  } else {
+    document.getElementById('header-week').textContent = '· no weeks yet';
+  }
+}
+
+function bindUI() {
+  document.getElementById('signout-btn').onclick = signOut;
+  document.getElementById('hamburger').onclick = () => document.getElementById('tabnav').classList.toggle('open');
+  document.querySelectorAll('nav.tabs button').forEach(btn => {
+    btn.onclick = () => switchTab(btn.dataset.tab);
+  });
+  document.getElementById('week-select').onchange = e => {
+    state.weekId = e.target.value;
+    const idx = state.weeks.findIndex(w => w.week_id === state.weekId);
+    state.prevWeekId = state.weeks[idx + 1] ? state.weeks[idx + 1].week_id : null;
+    document.getElementById('header-week').textContent = '· ' + state.weekId;
+    document.getElementById('compare-meta').textContent = state.prevWeekId ? 'vs. ' + state.prevWeekId : '';
+    refreshAll();
+  };
+  document.getElementById('entity-select').onchange = e => { state.entityFilter = e.target.value; refreshAll(); };
+
+  if (state.profile.role === 'admin') {
+    buildManualEntryForms();
+    document.getElementById('save-manual').onclick = saveManualEntries;
+    document.getElementById('ignored-add').onclick = addIgnoredSupplier;
+    document.getElementById('invite-btn').onclick = inviteUser;
+    const sd = document.getElementById('snapshot-date');
+    sd.onchange = onSnapshotDateChange;
+  }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
+  document.getElementById('tabnav').classList.remove('open');
+  Object.keys(state.charts).forEach(destroyChart);
+  refreshAll();
+}
+
+/* =====================================================================
+ *  DATA REFRESH (entry point — calls each tab's loader if it's active)
+ * =================================================================== */
+async function refreshAll() {
+  const active = document.querySelector('.tab-content.active');
+  if (!active) return;
+  // Admin tab can render even without a week (shows the create-week prompt)
+  if (!state.weekId && active.id !== 'tab-admin') return;
+  switch (active.id) {
+    case 'tab-overview':       await renderOverview(); break;
+    case 'tab-cash-position':  await renderCashPosition(); break;
+    case 'tab-ar-funding':     await renderARFunding(); break;
+    case 'tab-ap-liabilities': await renderAPLiabilities(); break;
+    case 'tab-cash-flow':      await renderCashFlow(); break;
+    case 'tab-admin':          await renderAdmin(); break;
+  }
+}
+
+/* =====================================================================
+ *  DATA LOADERS
+ * =================================================================== */
+async function loadCashPositionForWeeks(weekIds) {
+  if (!weekIds.length) return [];
+  const { data, error } = await sb.from('v_cash_position').select('*').in('week_id', weekIds);
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function loadCrossBilling(weekId) {
+  const { data, error } = await sb.from('v_cross_billing').select('*').eq('week_id', weekId);
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function loadFactoringSnapshot(weekId) {
+  const { data, error } = await sb.from('v_latest_factoring').select('*').eq('week_id', weekId);
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function loadBankBalances(weekId) {
+  const { data, error } = await sb.from('v_latest_bank_balances').select('*').eq('week_id', weekId);
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function loadManualLiabilities(weekId) {
+  const { data, error } = await sb.from('v_latest_liabilities').select('*').eq('week_id', weekId);
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function loadOverdueDetail(weekId) {
+  const { data, error } = await sb.from('sales_invoices')
+    .select('entity_id, company_name, outstanding, invoice_due')
+    .eq('week_id', weekId)
+    .gt('outstanding', 0)
+    .order('outstanding', { ascending: false })
+    .limit(50);
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function loadIgnoredSuppliers() {
+  const { data } = await sb.from('ignored_suppliers').select('*').order('supplier_name');
+  return data || [];
+}
+
+/* =====================================================================
+ *  OVERVIEW TAB
+ * =================================================================== */
+async function renderOverview() {
+  const ids = [state.weekId];
+  if (state.prevWeekId) ids.push(state.prevWeekId);
+  const cp = await loadCashPositionForWeeks(ids);
+  const curr = cp.filter(r => r.week_id === state.weekId);
+  const prev = cp.filter(r => r.week_id === state.prevWeekId);
+
+  const filterOk = r => state.entityFilter === 'all' ? true : r.entity_id === state.entityFilter;
+  const sum = (rows, key) => rows.filter(filterOk).reduce((a, r) => a + Number(r[key] || 0), 0);
+
+  const totalCash = sum(curr, 'total_including_overdue');
+  const cashAfter = sum(curr, 'cash_after_all_expenses');
+  const overdue   = sum(curr, 'overdue');
+  const totalCashPrev = sum(prev, 'total_including_overdue');
+  const cashAfterPrev = sum(prev, 'cash_after_all_expenses');
+  const overduePrev   = sum(prev, 'overdue');
+
+  document.getElementById('overview-kpis').innerHTML = `
+    ${kpiHTML('Total cash', totalCash, totalCash - totalCashPrev)}
+    ${kpiHTML('Cash after all expenses', cashAfter, cashAfter - cashAfterPrev)}
+    ${kpiHTML('Total overdue', overdue, overdue - overduePrev, true)}
+  `;
+
+  await renderTrendChart();
+  await renderAttribution();
+  await renderAlerts();
+}
+
+function kpiHTML(label, value, change, lowerIsBetter = false) {
+  const goodUp = lowerIsBetter ? change < 0 : change > 0;
+  const cls = change === 0 ? '' : (goodUp ? 'up' : 'down');
+  return `<div class="kpi"><div class="label">${label}</div><div class="value">${fmt.gbp(value)}</div><div class="change ${cls}">${fmt.delta(change)}${state.prevWeekId ? ' vs ' + state.prevWeekId : ''}</div></div>`;
+}
+
+async function renderTrendChart() {
+  const last12 = state.weeks.slice(0, 12).map(w => w.week_id).reverse();
+  if (!last12.length) return;
+  const cp = await loadCashPositionForWeeks(last12);
+  const labels = last12;
+  const colorByEntity = { cal_sameday: '#a78bfa', courier_logistics: '#34d399', cal_south: '#fb923c' };
+  const dashByEntity  = { cal_sameday: [], courier_logistics: [4,3], cal_south: [1,2] };
+
+  const datasets = state.entities.map(e => ({
+    label: e.display_name,
+    data: labels.map(wid => {
+      const r = cp.find(x => x.week_id === wid && x.entity_id === e.id);
+      return r ? Number(r.total_including_overdue) : null;
+    }),
+    borderColor: colorByEntity[e.id] || '#3b82f6',
+    backgroundColor: colorByEntity[e.id] || '#3b82f6',
+    borderDash: dashByEntity[e.id] || [],
+    tension: 0.25, pointRadius: 2, borderWidth: 1.5,
+    spanGaps: true,
+  }));
+
+  destroyChart('trend');
+  state.charts.trend = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#cbd5e1', boxWidth: 14 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt.gbp(c.parsed.y) } } },
+      scales: {
+        y: { ticks: { color: '#94a3b8', callback: v => '£' + (v/1000).toFixed(0) + 'k' }, grid: { color: '#1e293b' } },
+        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+async function renderAttribution() {
+  // Show top non-driver-COS purchase invoices new this week (vs last week's snapshot)
+  const ul = document.getElementById('attribution-list');
+  if (!state.prevWeekId) { ul.innerHTML = '<li class="muted tiny">No prior week to compare.</li>'; return; }
+  const ignored = await loadIgnoredSuppliers();
+  const ignSet = new Set(ignored.map(i => i.entity_id + '|' + i.supplier_name.toLowerCase()));
+
+  // Driver COS exclusion:
+  //  - For C&L and Cal South: any bill where supplier is "Cal Sameday" (intercompany driver recharge)
+  //  - For Cal Sameday: only show invoices >= £3k (since SmartPay drivers individually rarely exceed £3k)
+  const { data: rows } = await sb.from('purchase_invoices')
+    .select('entity_id, company_name, gross, accounting_date, description')
+    .eq('week_id', state.weekId)
+    .gte('gross', 3000)
+    .order('gross', { ascending: false })
+    .limit(40);
+
+  const items = (rows || []).filter(r => {
+    const s = (r.company_name || '').trim().toLowerCase();
+    if (state.entityFilter !== 'all' && r.entity_id !== state.entityFilter) return false;
+    if (r.entity_id !== 'cal_sameday' && (s === 'cal sameday' || s === 'cal sameday limited' || s === 'cal sameday ltd')) return false;
+    if (r.entity_id === 'cal_sameday' && Number(r.gross) < 3000) return false;
+    if (ignSet.has(r.entity_id + '|' + s)) return false;
+    return true;
+  }).slice(0, 10);
+
+  if (!items.length) { ul.innerHTML = '<li class="muted tiny">No flagged movements ≥ £3k this week.</li>'; return; }
+  const entMap = Object.fromEntries(state.entities.map(e => [e.id, e.display_name]));
+  ul.innerHTML = items.map(r => `
+    <li>
+      <span class="amt neg">−${fmt.gbp(r.gross)}</span>
+      <span class="ent">${entMap[r.entity_id] || r.entity_id}</span>
+      <span>${(r.company_name || '—')}${r.description ? ' · <span class="muted tiny">' + escapeHtml(r.description) + '</span>' : ''}</span>
+    </li>`).join('');
+}
+
+async function renderAlerts() {
+  const alerts = await computeAlerts();
+  const ul = document.getElementById('alerts-list');
+  document.getElementById('alerts-count').textContent = alerts.length ? '(' + alerts.length + ')' : '';
+  if (!alerts.length) { ul.innerHTML = '<li class="muted tiny">No alerts.</li>'; return; }
+  ul.innerHTML = alerts.map(a => `<li><span class="chip ${a.kind}">${a.tag}</span><span>${a.text}</span></li>`).join('');
+}
+
+async function computeAlerts() {
+  const out = [];
+  // 1. Stale balances: same value across last 3 weeks
+  const last3 = state.weeks.slice(0, 3).map(w => w.week_id);
+  if (last3.length === 3) {
+    const { data: bb } = await sb.from('bank_balances').select('week_id, entity_id, bank_name, balance').in('week_id', last3);
+    const byKey = {};
+    (bb || []).forEach(r => {
+      const k = r.entity_id + '|' + r.bank_name;
+      byKey[k] = byKey[k] || {};
+      byKey[k][r.week_id] = Number(r.balance);
+    });
+    Object.entries(byKey).forEach(([k, vals]) => {
+      const seen = Object.values(vals);
+      if (seen.length === 3 && seen.every(v => v === seen[0]) && seen[0] !== 0) {
+        const [eid, bk] = k.split('|');
+        const eName = state.entities.find(e => e.id === eid)?.display_name || eid;
+        out.push({ kind: 'warn', tag: 'Stale', text: `${eName} ${bk} balance unchanged for 3 weeks — confirm with finance.` });
+      }
+    });
+  }
+  // 2. Skipton low availability vs balance (potential headroom warning)
+  const fs = await loadFactoringSnapshot(state.weekId);
+  fs.forEach(f => {
+    const bal = Number(f.skipton_balance || 0);
+    const avail = Number(f.skipton_availability || 0);
+    if (bal > 0 && avail > 0 && avail < bal * 0.15) {
+      const eName = state.entities.find(e => e.id === f.entity_id)?.display_name || f.entity_id;
+      out.push({ kind: 'warn', tag: 'Skipton', text: `${eName} Skipton availability ${fmt.gbp(avail)} is low vs balance ${fmt.gbp(bal)}.` });
+    }
+  });
+  return out;
+}
+
+/* =====================================================================
+ *  CASH POSITION TAB
+ * =================================================================== */
+async function renderCashPosition() {
+  const ids = [state.weekId];
+  if (state.prevWeekId) ids.push(state.prevWeekId);
+  const [bb, fs, cp, prevBb, prevFs] = await Promise.all([
+    loadBankBalances(state.weekId),
+    loadFactoringSnapshot(state.weekId),
+    loadCashPositionForWeeks(ids),
+    state.prevWeekId ? loadBankBalances(state.prevWeekId) : Promise.resolve([]),
+    state.prevWeekId ? loadFactoringSnapshot(state.prevWeekId) : Promise.resolve([]),
+  ]);
+
+  const ents = state.entities.slice().sort((a, b) => a.sort_order - b.sort_order);
+  const tbody = document.querySelector('#position-table tbody');
+  const rows = [];
+
+  // Bank rows
+  BANK_TYPES.forEach(b => {
+    const cells = ents.map(e => {
+      const v = Number((bb.find(r => r.entity_id === e.id && r.bank_name === b.key) || {}).balance || 0);
+      const pv = Number((prevBb.find(r => r.entity_id === e.id && r.bank_name === b.key) || {}).balance || 0);
+      return { v, d: v - pv };
+    });
+    rows.push({ label: b.label, cells });
+  });
+
+  // Skipton balance + in-transit (separate rows so the maths is transparent)
+  rows.push({
+    label: 'Skipton balance',
+    cells: ents.map(e => {
+      const v = Number((fs.find(r => r.entity_id === e.id) || {}).skipton_balance || 0);
+      const pv = Number((prevFs.find(r => r.entity_id === e.id) || {}).skipton_balance || 0);
+      return { v, d: v - pv };
+    })
+  });
+  rows.push({
+    label: 'Skipton in transit',
+    cells: ents.map(e => {
+      const v = Number((fs.find(r => r.entity_id === e.id) || {}).skipton_in_transit || 0);
+      const pv = Number((prevFs.find(r => r.entity_id === e.id) || {}).skipton_in_transit || 0);
+      return { v, d: v - pv };
+    })
+  });
+
+  // Overdue row (computed)
+  rows.push({
+    label: 'Overdue',
+    classes: 'warn',
+    cells: ents.map(e => {
+      const r  = cp.find(x => x.week_id === state.weekId && x.entity_id === e.id);
+      const pr = cp.find(x => x.week_id === state.prevWeekId && x.entity_id === e.id);
+      const v = r ? Number(r.overdue) : 0;
+      const pv = pr ? Number(pr.overdue) : 0;
+      return { v, d: v - pv };
+    })
+  });
+
+  let html = rows.map(row => {
+    const total = row.cells.reduce((a, c) => a + c.v, 0);
+    const totalPrev = row.cells.reduce((a, c) => a + (c.v - c.d), 0);
+    return `<tr><td>${row.label}</td>` +
+      row.cells.map(c => `<td class="num">${fmt.gbp(c.v)}<div class="delta ${deltaClass(c.d)}">${fmt.delta(c.d)}</div></td>`).join('') +
+      `<td class="num"><strong>${fmt.gbp(total)}</strong><div class="delta ${deltaClass(total - totalPrev)}">${fmt.delta(total - totalPrev)}</div></td>` +
+      `</tr>`;
+  }).join('');
+
+  // Totals
+  const taoRow = ents.map(e => {
+    const r = cp.find(x => x.week_id === state.weekId && x.entity_id === e.id);
+    return r ? Number(r.total_after_overdue) : 0;
+  });
+  const tioRow = ents.map(e => {
+    const r = cp.find(x => x.week_id === state.weekId && x.entity_id === e.id);
+    return r ? Number(r.total_including_overdue) : 0;
+  });
+  html += `<tr class="totals"><td>Total after overdue</td>` +
+    taoRow.map(v => `<td class="num">${fmt.gbp(v)}</td>`).join('') +
+    `<td class="num">${fmt.gbp(taoRow.reduce((a, b) => a + b, 0))}</td></tr>`;
+  html += `<tr class="totals"><td>Total incl. overdue</td>` +
+    tioRow.map(v => `<td class="num">${fmt.gbp(v)}</td>`).join('') +
+    `<td class="num">${fmt.gbp(tioRow.reduce((a, b) => a + b, 0))}</td></tr>`;
+
+  tbody.innerHTML = html;
+
+  // Cross-billing matrix
+  const cb = await loadCrossBilling(state.weekId);
+  const cbBody = document.querySelector('#cross-billing-table tbody');
+  cbBody.innerHTML = ents.map(from => {
+    const cells = ents.map(to => {
+      if (from.id === to.id) return '<td class="num muted">—</td>';
+      const row = cb.find(r => r.from_entity_id === from.id && r.to_entity_id === to.id);
+      return `<td class="num">${fmt.gbp(row ? row.outstanding_total : 0)}</td>`;
+    }).join('');
+    return `<tr><td>From ${from.display_name}</td>${cells}</tr>`;
+  }).join('');
+}
+
+/* =====================================================================
+ *  AR & FUNDING TAB
+ * =================================================================== */
+async function renderARFunding() {
+  const ids = [state.weekId];
+  if (state.prevWeekId) ids.push(state.prevWeekId);
+  const [cp, fs, overdueDetail] = await Promise.all([
+    loadCashPositionForWeeks(ids),
+    loadFactoringSnapshot(state.weekId),
+    loadOverdueDetail(state.weekId),
+  ]);
+
+  const filterOk = r => state.entityFilter === 'all' ? true : r.entity_id === state.entityFilter;
+  const sum = (rows, key) => rows.filter(filterOk).reduce((a, r) => a + Number(r[key] || 0), 0);
+  const overdue = sum(cp.filter(r => r.week_id === state.weekId), 'overdue');
+  const overduePrev = sum(cp.filter(r => r.week_id === state.prevWeekId), 'overdue');
+  const skiptonAvail = fs.filter(filterOk).reduce((a, f) => a + Number(f.skipton_availability || 0), 0);
+  const skiptonBalance = fs.filter(filterOk).reduce((a, f) => a + Number(f.skipton_balance || 0), 0);
+
+  document.getElementById('ar-kpis').innerHTML = `
+    ${kpiHTML('Total overdue', overdue, overdue - overduePrev, true)}
+    ${kpiHTML('Skipton availability', skiptonAvail, 0)}
+    ${kpiHTML('Skipton balance', skiptonBalance, 0)}
+  `;
+
+  // Ageing chart
+  const today = new Date();
+  const buckets = { '0-30': {}, '31-60': {}, '61-90': {}, '90+': {} };
+  state.entities.forEach(e => Object.keys(buckets).forEach(b => buckets[b][e.id] = 0));
+  overdueDetail.forEach(r => {
+    if (!r.invoice_due) return;
+    const days = Math.floor((today - new Date(r.invoice_due)) / 86400000);
+    const b = days <= 30 ? '0-30' : days <= 60 ? '31-60' : days <= 90 ? '61-90' : '90+';
+    buckets[b][r.entity_id] = (buckets[b][r.entity_id] || 0) + Number(r.outstanding || 0);
+  });
+
+  destroyChart('age');
+  const ents = state.entities.slice().sort((a, b) => a.sort_order - b.sort_order);
+  state.charts.age = new Chart(document.getElementById('ageChart'), {
+    type: 'bar',
+    data: {
+      labels: ents.map(e => e.display_name),
+      datasets: [
+        { label: '0-30d',  data: ents.map(e => buckets['0-30'][e.id]),  backgroundColor: '#34d399', stack: 's' },
+        { label: '31-60d', data: ents.map(e => buckets['31-60'][e.id]), backgroundColor: '#60a5fa', stack: 's' },
+        { label: '61-90d', data: ents.map(e => buckets['61-90'][e.id]), backgroundColor: '#f59e0b', stack: 's' },
+        { label: '90+d',   data: ents.map(e => buckets['90+'][e.id]),   backgroundColor: '#f87171', stack: 's' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { labels: { color: '#cbd5e1', boxWidth: 12 }, position: 'bottom' } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#94a3b8', callback: v => '£' + (v/1000).toFixed(0) + 'k' }, grid: { color: '#1e293b' } },
+        y: { stacked: true, ticks: { color: '#94a3b8' }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Skipton balance vs availability per entity
+  const utilEl = document.getElementById('facility-utilisation');
+  utilEl.innerHTML = fs.map(f => {
+    const eName = state.entities.find(e => e.id === f.entity_id)?.display_name || f.entity_id;
+    const bal = Number(f.skipton_balance || 0);
+    const avail = Number(f.skipton_availability || 0);
+    const inT = Number(f.skipton_in_transit || 0);
+    return `<div style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>${eName}</span><span class="muted">balance ${fmt.gbp(bal)} · in transit ${fmt.gbp(inT)} · available ${fmt.gbp(avail)}</span></div>
+    </div>`;
+  }).join('') || '<div class="muted tiny">No Skipton entries for this week.</div>';
+
+  // Top overdue
+  const tbody = document.querySelector('#top-overdue-table tbody');
+  const top = overdueDetail.slice(0, 15);
+  const entMap = Object.fromEntries(state.entities.map(e => [e.id, e.display_name]));
+  tbody.innerHTML = top.map(r => {
+    const days = r.invoice_due ? Math.floor((today - new Date(r.invoice_due)) / 86400000) : 0;
+    return `<tr><td>${escapeHtml(r.company_name || '—')}</td><td>${entMap[r.entity_id] || r.entity_id}</td><td class="num">${fmt.gbp(r.outstanding)}</td><td class="num">${days}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="muted tiny">No overdue invoices for this week.</td></tr>';
+
+}
+
+/* =====================================================================
+ *  AP & LIABILITIES TAB
+ * =================================================================== */
+async function renderAPLiabilities() {
+  const ids = [state.weekId];
+  if (state.prevWeekId) ids.push(state.prevWeekId);
+  const cp = await loadCashPositionForWeeks(ids);
+  const ml = await loadManualLiabilities(state.weekId);
+
+  const filterOk = r => state.entityFilter === 'all' ? true : r.entity_id === state.entityFilter;
+  const sum = (rows, key) => rows.filter(filterOk).reduce((a, r) => a + Number(r[key] || 0), 0);
+  const payables = sum(cp.filter(r => r.week_id === state.weekId), 'suppliers_outstanding');
+  const tax = sum(cp.filter(r => r.week_id === state.weekId), 'tax_accrual');
+  const futureOther = sum(cp.filter(r => r.week_id === state.weekId), 'future_liabilities_other');
+
+  document.getElementById('ap-kpis').innerHTML = `
+    ${kpiHTML('Outstanding payables', payables, 0, true)}
+    ${kpiHTML('Tax accrual', tax, 0, true)}
+    ${kpiHTML('Future liabilities', futureOther, 0, true)}
+  `;
+
+  const ents = state.entities.slice().sort((a, b) => a.sort_order - b.sort_order);
+  destroyChart('liab');
+  state.charts.liab = new Chart(document.getElementById('liabChart'), {
+    type: 'bar',
+    data: {
+      labels: ents.map(e => e.display_name),
+      datasets: [
+        { label: 'Suppliers',          data: ents.map(e => Number((cp.find(r => r.week_id === state.weekId && r.entity_id === e.id) || {}).suppliers_outstanding || 0)), backgroundColor: '#a78bfa', stack: 's' },
+        { label: 'Tax accrual',        data: ents.map(e => Number((cp.find(r => r.week_id === state.weekId && r.entity_id === e.id) || {}).tax_accrual || 0)),          backgroundColor: '#f59e0b', stack: 's' },
+        { label: 'Future liabilities', data: ents.map(e => Number((cp.find(r => r.week_id === state.weekId && r.entity_id === e.id) || {}).future_liabilities_other || 0)), backgroundColor: '#94a3b8', stack: 's' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#cbd5e1', boxWidth: 12 }, position: 'bottom' } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#94a3b8', callback: v => '£' + (v/1000).toFixed(0) + 'k' }, grid: { color: '#1e293b' } }
+      }
+    }
+  });
+
+  // Top suppliers
+  const { data: rawSup } = await sb.from('purchase_invoices').select('entity_id, company_name, outstanding').eq('week_id', state.weekId).gt('outstanding', 0);
+  const supTotals = {};
+  (rawSup || []).forEach(r => {
+    const k = r.entity_id + '||' + (r.company_name || '—');
+    supTotals[k] = (supTotals[k] || 0) + Number(r.outstanding || 0);
+  });
+  const top = Object.entries(supTotals).sort((a,b) => b[1] - a[1]).slice(0, 10);
+  const entMap = Object.fromEntries(state.entities.map(e => [e.id, e.display_name]));
+  document.querySelector('#top-suppliers-table tbody').innerHTML = top.map(([k, v]) => {
+    const [eid, name] = k.split('||');
+    return `<tr><td>${escapeHtml(name)}</td><td>${entMap[eid] || eid}</td><td class="num">${fmt.gbp(v)}</td></tr>`;
+  }).join('') || '<tr><td colspan="3" class="muted tiny">No outstanding payables for this week.</td></tr>';
+
+  // Due next week (sum manual liabilities across entities)
+  const dnGrid = document.getElementById('due-next-week-grid');
+  const sumDue = key => ml.filter(filterOk).reduce((a, r) => a + Number(r[key] || 0), 0);
+  dnGrid.innerHTML = [
+    'driver_run','ccc','salary','pension','vat_accrual','ct_accrual','ni','other'
+  ].map(k => {
+    const meta = LIABILITY_FIELDS.find(f => f.key === k);
+    return `<div class="kpi"><div class="label">${meta ? meta.label : k}</div><div class="value">${fmt.gbp(sumDue(k))}</div></div>`;
+  }).join('');
+}
+
+/* =====================================================================
+ *  CASH FLOW TAB
+ * =================================================================== */
+async function renderCashFlow() {
+  const last12 = state.weeks.slice(0, 12).map(w => w.week_id).reverse();
+  const cp = await loadCashPositionForWeeks(last12);
+  const filterOk = r => state.entityFilter === 'all' ? true : r.entity_id === state.entityFilter;
+  const actuals = last12.map(wid => {
+    return cp.filter(r => r.week_id === wid).filter(filterOk).reduce((a, r) => a + Number(r.total_including_overdue || 0), 0);
+  });
+
+  // Forecast points for the latest snapshot
+  const { data: fp } = await sb.from('forecast_points').select('*').eq('snapshot_week_id', state.weekId).order('forecast_week_id');
+  const forecastWeeks = (fp || []).map(p => p.forecast_week_id);
+  const forecastVals  = (fp || []).map(p => Number(p.forecast_balance));
+
+  const labels = [...last12, ...forecastWeeks];
+  const actualSeries = [...actuals, ...forecastWeeks.map(() => null)];
+  const forecastSeries = [...last12.map(() => null), ...forecastVals];
+  if (actuals.length && forecastVals.length) {
+    forecastSeries[last12.length - 1] = actuals[actuals.length - 1];
+  }
+
+  destroyChart('cf');
+  state.charts.cf = new Chart(document.getElementById('cfChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Actuals', data: actualSeries, borderColor: '#3b82f6', backgroundColor: '#3b82f6', tension: 0.25, pointRadius: 2, borderWidth: 2, spanGaps: false },
+        { label: 'Forecast', data: forecastSeries, borderColor: '#94a3b8', borderDash: [5,4], tension: 0.25, pointRadius: 3, borderWidth: 1.5, spanGaps: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#cbd5e1' } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmt.gbp(c.parsed.y) } } },
+      scales: {
+        y: { ticks: { color: '#94a3b8', callback: v => '£' + (v/1000).toFixed(0) + 'k' }, grid: { color: '#1e293b' } },
+        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+      }
+    }
+  });
+
+  // KPIs
+  const current = actuals[actuals.length - 1] || 0;
+  const fourWk = forecastVals.slice(0, 4).reduce((a, b) => a + b, 0) / Math.max(forecastVals.slice(0, 4).length, 1);
+  const lowest = forecastVals.length ? Math.min(...forecastVals) : null;
+  const lowestWk = lowest != null ? forecastWeeks[forecastVals.indexOf(lowest)] : null;
+  document.getElementById('cf-kpis').innerHTML = `
+    ${kpiHTML('Current position', current, 0)}
+    <div class="kpi"><div class="label">Forecast 4 wk avg</div><div class="value">${fmt.gbp(fourWk || 0)}</div></div>
+    <div class="kpi"><div class="label">Lowest in forecast</div><div class="value">${lowest != null ? fmt.gbp(lowest) : '—'}</div><div class="change">${lowestWk || ''}</div></div>
+    <div class="kpi"><div class="label">Forecast horizon</div><div class="value">${forecastVals.length} wks</div></div>
+  `;
+
+  // Notes pinned to forecast weeks
+  const { data: notes } = await sb.from('week_notes').select('*').eq('week_id', state.weekId).eq('note_type', 'forecast_note').order('id');
+  const ul = document.getElementById('forecast-notes');
+  ul.innerHTML = (notes || []).map(n => `<li><span class="chip info">${n.title || 'Note'}</span><span>${escapeHtml(n.body)}</span></li>`).join('') ||
+    '<li class="muted tiny">No forecast notes for this week.</li>';
+}
+
+/* =====================================================================
+ *  ADMIN TAB
+ * =================================================================== */
+async function renderAdmin() {
+  if (state.profile.role !== 'admin') return;
+
+  await renderUsersList();
+  await renderIgnoredList();
+
+  // Pre-fill snapshot date with this week's Friday if empty
+  const sd = document.getElementById('snapshot-date');
+  if (sd && !sd.value) {
+    const today = new Date();
+    const dow = today.getDay();
+    const diff = (5 - dow + 7) % 7;
+    const friday = new Date(today);
+    friday.setDate(today.getDate() + diff);
+    sd.value = friday.toISOString().slice(0, 10);
+    onSnapshotDateChange();
+  }
+
+  const checklist = [
+    { key: 'sl_cs',  label: 'Sales ledger — Cal Sameday',           kind: 'sales',    entity: 'cal_sameday' },
+    { key: 'pl_cs',  label: 'Purchase ledger — Cal Sameday',        kind: 'purchase', entity: 'cal_sameday' },
+    { key: 'sl_cl',  label: 'Sales ledger — Courier & Logistics',   kind: 'sales',    entity: 'courier_logistics' },
+    { key: 'pl_cl',  label: 'Purchase ledger — Courier & Logistics',kind: 'purchase', entity: 'courier_logistics' },
+    { key: 'sl_csh', label: 'Sales ledger — Cal South',             kind: 'sales',    entity: 'cal_south' },
+    { key: 'pl_csh', label: 'Purchase ledger — Cal South',          kind: 'purchase', entity: 'cal_south' },
+  ];
+
+  const wrap = document.getElementById('upload-checklist');
+  const checks = state.weekId ? await checkUploadStatus() : {};
+  const hint = state.weekId
+    ? `<div class="meta tiny" style="margin-bottom:8px;">Status shown for <strong>${state.weekId}</strong>. Re-uploading replaces the snapshot for that week + entity.</div>`
+    : `<div class="meta tiny" style="margin-bottom:8px;">No week yet for this snapshot date. Uploading any file will create it.</div>`;
+  wrap.innerHTML = hint + checklist.map(c => {
+    const done = checks[c.key];
+    return `<div class="upload-row">
+      <span class="icon">${done ? '✅' : '⏳'}</span>
+      <span class="name">${c.label}${done ? `<div class="when">received</div>` : ''}</span>
+      <input type="file" accept=".csv,.xlsx" data-upload="${c.key}" data-kind="${c.kind}" data-entity="${c.entity || ''}" style="font-size:12px;max-width:240px;" />
+    </div>`;
+  }).join('');
+  if (state.weekId) {
+    document.getElementById('upload-progress').textContent = Object.values(checks).filter(Boolean).length + ' of ' + checklist.length + ' received';
+  } else {
+    document.getElementById('upload-progress').textContent = '';
+  }
+
+  wrap.querySelectorAll('input[type=file]').forEach(inp => {
+    inp.onchange = e => handleUpload(e.target);
+  });
+
+  if (state.weekId) await loadManualEntriesIntoForm();
+}
+
+async function checkUploadStatus() {
+  const r = {};
+  for (const e of state.entities) {
+    const { count: sc } = await sb.from('sales_invoices').select('id', { count: 'exact', head: true }).eq('week_id', state.weekId).eq('entity_id', e.id);
+    const { count: pc } = await sb.from('purchase_invoices').select('id', { count: 'exact', head: true }).eq('week_id', state.weekId).eq('entity_id', e.id);
+    if (e.id === 'cal_sameday')        { r['sl_cs']  = (sc || 0) > 0; r['pl_cs']  = (pc || 0) > 0; }
+    else if (e.id === 'courier_logistics') { r['sl_cl']  = (sc || 0) > 0; r['pl_cl']  = (pc || 0) > 0; }
+    else if (e.id === 'cal_south')     { r['sl_csh'] = (sc || 0) > 0; r['pl_csh'] = (pc || 0) > 0; }
+  }
+  return r;
+}
+
+function buildManualEntryForms() {
+  // Bank balance fields per entity
+  state.entities.forEach(e => {
+    const grid = document.querySelector(`.form-grid[data-entity="${e.id}"][data-section="banks"]`);
+    if (!grid) return;
+    grid.innerHTML = BANK_TYPES.map(b => `
+      <div>
+        <label>${b.label === 'Main bank' ? `${b.label} (${e.main_bank_name})` : b.label}</label>
+        <input type="text" inputmode="decimal" data-bank="${b.key}" data-entity="${e.id}" placeholder="0.00" />
+      </div>
+    `).join('');
+  });
+
+  // Skipton manual fields per entity that has a factoring facility
+  state.entities.filter(e => e.factoring_account_number).forEach(e => {
+    const grid = document.querySelector(`.form-grid[data-entity="${e.id}"][data-section="skipton"]`);
+    if (!grid) return;
+    grid.innerHTML = SKIPTON_FIELDS.map(f => `
+      <div>
+        <label>${f.label}</label>
+        <input type="text" inputmode="decimal" data-skipton="${f.key}" data-entity="${e.id}" placeholder="0.00" />
+      </div>
+    `).join('');
+  });
+
+  // Manual liabilities form (one row per entity)
+  const liab = document.getElementById('liabilities-form');
+  liab.innerHTML = state.entities.map(e => `
+    <div style="margin-top:14px;">
+      <div class="section-h" style="margin:6px 0 8px;">${e.display_name}</div>
+      <div class="form-grid">
+        ${LIABILITY_FIELDS.map(f => `
+          <div>
+            <label>${f.label}</label>
+            <input type="text" inputmode="decimal" data-liab="${f.key}" data-entity="${e.id}" placeholder="0.00" />
+          </div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function onSnapshotDateChange() {
+  const dateStr = document.getElementById('snapshot-date').value;
+  if (!dateStr) return;
+  const friday = fridayOfISOWeek(new Date(dateStr));
+  const weekId = isoWeekId(friday);
+  document.getElementById('snapshot-week-label').textContent = weekId + ' · Friday ' + friday.toISOString().slice(0, 10);
+  // If a week with this id exists, switch to it so the dashboard reflects it
+  if (state.weeks.find(w => w.week_id === weekId)) {
+    state.weekId = weekId;
+    const idx = state.weeks.findIndex(w => w.week_id === weekId);
+    state.prevWeekId = state.weeks[idx + 1] ? state.weeks[idx + 1].week_id : null;
+    document.getElementById('week-select').value = weekId;
+    document.getElementById('header-week').textContent = '· ' + weekId;
+    document.getElementById('compare-meta').textContent = state.prevWeekId ? 'vs. ' + state.prevWeekId : '';
+    refreshAll();
+  } else {
+    document.getElementById('snapshot-week-label').textContent += ' (will be created on first save/upload)';
+  }
+}
+
+async function loadManualEntriesIntoForm() {
+  if (!state.weekId) return;
+  const [{ data: bb }, { data: fs }, { data: ml }] = await Promise.all([
+    sb.from('v_latest_bank_balances').select('*').eq('week_id', state.weekId),
+    sb.from('v_latest_factoring').select('*').eq('week_id', state.weekId),
+    sb.from('v_latest_liabilities').select('*').eq('week_id', state.weekId),
+  ]);
+  const banks = bb || [], factoring = fs || [], liabs = ml || [];
+
+  document.querySelectorAll('input[data-bank]').forEach(inp => {
+    const r = banks.find(x => x.entity_id === inp.dataset.entity && x.bank_name === inp.dataset.bank);
+    inp.value = r ? Number(r.balance).toFixed(2) : '';
+  });
+  document.querySelectorAll('input[data-skipton]').forEach(inp => {
+    const r = factoring.find(x => x.entity_id === inp.dataset.entity);
+    inp.value = r ? Number(r[inp.dataset.skipton] || 0).toFixed(2) : '';
+  });
+  document.querySelectorAll('input[data-liab]').forEach(inp => {
+    const r = liabs.find(x => x.entity_id === inp.dataset.entity);
+    inp.value = r ? Number(r[inp.dataset.liab] || 0).toFixed(2) : '';
+  });
+
+  // Show last saved timestamp
+  const stamps = [
+    ...banks.map(r => r.entered_at),
+    ...factoring.map(r => r.entered_at),
+    ...liabs.map(r => r.entered_at),
+  ].filter(Boolean).map(s => new Date(s).getTime());
+  const lastSavedEl = document.getElementById('manual-last-saved');
+  if (lastSavedEl) {
+    if (stamps.length) {
+      const max = new Date(Math.max(...stamps));
+      lastSavedEl.textContent = 'last edited ' + max.toLocaleString('en-GB');
+    } else {
+      lastSavedEl.textContent = 'no saves yet for this week';
+    }
+  }
+}
+
+async function saveManualEntries() {
+  const status = document.getElementById('save-status');
+  status.textContent = 'Saving…';
+
+  // Resolve week from snapshot date picker (creates if needed)
+  const dateStr = document.getElementById('snapshot-date').value;
+  if (!dateStr) { status.textContent = ''; return toast('Pick a snapshot date first', 'error'); }
+  let weekId;
+  try { weekId = await ensureWeek(new Date(dateStr)); }
+  catch (e) { status.textContent = 'Save failed'; return toast(e.message, 'error'); }
+  state.weekId = weekId;
+
+  const banks = [];
+  document.querySelectorAll('input[data-bank]').forEach(inp => {
+    const raw = (inp.value || '').trim();
+    if (raw === '') return; // skip blanks — don't overwrite with 0
+    const v = parseFloat(raw.replace(/[£,\s]/g, '')) || 0;
+    banks.push({
+      week_id: weekId, entity_id: inp.dataset.entity, bank_name: inp.dataset.bank,
+      balance: v, entered_by: state.user.id
+    });
+  });
+
+  const skiptonByEntity = {};
+  document.querySelectorAll('input[data-skipton]').forEach(inp => {
+    const raw = (inp.value || '').trim();
+    const v = raw === '' ? 0 : (parseFloat(raw.replace(/[£,\s]/g, '')) || 0);
+    skiptonByEntity[inp.dataset.entity] = skiptonByEntity[inp.dataset.entity] || { week_id: weekId, entity_id: inp.dataset.entity };
+    skiptonByEntity[inp.dataset.entity][inp.dataset.skipton] = v;
+  });
+  const skiptonRows = Object.values(skiptonByEntity).filter(r =>
+    r.skipton_balance > 0 || r.skipton_availability > 0 || r.skipton_in_transit > 0
+  );
+
+  const liabsByEntity = {};
+  document.querySelectorAll('input[data-liab]').forEach(inp => {
+    const raw = (inp.value || '').trim();
+    const v = raw === '' ? 0 : (parseFloat(raw.replace(/[£,\s]/g, '')) || 0);
+    liabsByEntity[inp.dataset.entity] = liabsByEntity[inp.dataset.entity] || { week_id: weekId, entity_id: inp.dataset.entity };
+    liabsByEntity[inp.dataset.entity][inp.dataset.liab] = v;
+  });
+  const liabs = Object.values(liabsByEntity).filter(r =>
+    Object.entries(r).some(([k, v]) => k !== 'week_id' && k !== 'entity_id' && Number(v) !== 0)
+  );
+
+  // INSERT (not upsert) so each save is a new history row; latest wins via v_latest_* views
+  const e1 = banks.length        ? (await sb.from('bank_balances').insert(banks)).error : null;
+  const e2 = skiptonRows.length  ? (await sb.from('factoring_snapshot').insert(skiptonRows)).error : null;
+  const e3 = liabs.length         ? (await sb.from('manual_liabilities').insert(liabs)).error : null;
+
+  if (e1 || e2 || e3) {
+    status.textContent = 'Save failed';
+    toast((e1 || e2 || e3).message, 'error');
+  } else {
+    status.textContent = 'Saved ' + new Date().toLocaleTimeString();
+    toast('Manual entries saved · ' + weekId, 'ok');
+    await refreshAll();
+  }
+}
+
+async function renderUsersList() {
+  const { data, error } = await sb.from('profiles').select('*').order('email');
+  const ul = document.getElementById('users-list');
+  if (error) { ul.textContent = 'Error: ' + error.message; return; }
+  const rows = (data || []).map(p => {
+    const isMe = p.id === state.user.id;
+    const isAdmin = p.role === 'admin';
+    const otherRole = isAdmin ? 'user' : 'admin';
+    const btnLabel = isAdmin ? 'Make read-only' : 'Make admin';
+    const buttonHTML = isMe
+      ? `<span class="meta tiny">that's you</span>`
+      : `<button data-uid="${p.id}" data-role="${otherRole}" class="role-toggle signout">${btnLabel}</button>`;
+    return `
+      <div class="upload-row" style="border-top:1px solid #1e293b;">
+        <span class="name">${escapeHtml(p.email || '')}<div class="when">${escapeHtml(p.display_name || '')}</div></span>
+        <span class="chip ${isAdmin ? 'info' : ''}">${p.role}</span>
+        ${buttonHTML}
+      </div>`;
+  }).join('');
+  ul.innerHTML = rows || '<div class="muted tiny">No users yet.</div>';
+  ul.querySelectorAll('.role-toggle').forEach(b => {
+    b.onclick = () => toggleUserRole(b.dataset.uid, b.dataset.role);
+  });
+}
+
+async function toggleUserRole(userId, newRole) {
+  const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', userId);
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Role set to ' + newRole, 'ok');
+  await renderUsersList();
+}
+
+async function inviteUser() {
+  const email = (document.getElementById('invite-email').value || '').trim();
+  const role  = document.getElementById('invite-role').value;
+  if (!email) { toast('Enter an email', 'error'); return; }
+  const btn = document.getElementById('invite-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  // Record the desired role for when their profile gets auto-created on first sign in
+  await sb.from('pending_invites').upsert({ email: email.toLowerCase(), role, invited_by: state.user.id }, { onConflict: 'email' });
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: window.location.href } });
+  btn.disabled = false; btn.textContent = 'Send invite';
+  if (error) { toast(error.message, 'error'); return; }
+  document.getElementById('invite-email').value = '';
+  toast('Magic link sent to ' + email, 'ok');
+  await renderUsersList();
+}
+
+async function renderIgnoredList() {
+  const items = await loadIgnoredSuppliers();
+  const wrap = document.getElementById('ignored-list');
+  const entMap = Object.fromEntries(state.entities.map(e => [e.id, e.display_name]));
+  wrap.innerHTML = items.map(i => `
+    <div class="upload-row" style="border-top:1px solid #1e293b;">
+      <span class="name">${escapeHtml(i.supplier_name)}<div class="when">${entMap[i.entity_id] || i.entity_id}</div></span>
+      <button data-id="${i.id}" class="signout">Remove</button>
+    </div>`).join('') || '<div class="muted tiny">No ignored suppliers yet.</div>';
+  wrap.querySelectorAll('button').forEach(b => {
+    b.onclick = async () => {
+      await sb.from('ignored_suppliers').delete().eq('id', b.dataset.id);
+      await renderIgnoredList();
+    };
+  });
+}
+
+async function addIgnoredSupplier() {
+  const entity_id = document.getElementById('ignored-entity-select').value;
+  const supplier_name = document.getElementById('ignored-supplier-input').value.trim();
+  if (!supplier_name) return;
+  const { error } = await sb.from('ignored_suppliers').insert({ entity_id, supplier_name, added_by: state.user.id });
+  if (error) toast(error.message, 'error');
+  else {
+    document.getElementById('ignored-supplier-input').value = '';
+    await renderIgnoredList();
+  }
+}
+
+
+/* =====================================================================
+ *  FILE UPLOAD HANDLERS
+ *   - sales / purchase: Clearbooks CSV
+ *   - smartpay: SmartPay CSV
+ *   - dancerace: PDF parsing -> manual entry form for the headline numbers
+ * =================================================================== */
+/* ---- WEEK DETECTION FROM FILENAME ---------------------------------- */
+function extractDateFromFilename(name) {
+  if (!name) return null;
+  // ISO: 2026-05-01
+  let m = name.match(/(20\d{2})-(\d{2})-(\d{2})/);
+  if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  // Compact: 20260501 (followed by anything, often a timestamp)
+  m = name.match(/(20\d{2})(\d{2})(\d{2})/);
+  if (m) {
+    const mm = +m[2], dd = +m[3];
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+      return new Date(Date.UTC(+m[1], mm - 1, dd));
+    }
+  }
+  // DD-Mon-YYYY or DD-Mon-YY
+  m = name.match(/(\d{1,2})[-_](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[-_](\d{2,4})/i);
+  if (m) {
+    const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+    const mm = months[m[2].toLowerCase()];
+    let yr = +m[3]; if (yr < 100) yr += 2000;
+    return new Date(Date.UTC(yr, mm - 1, +m[1]));
+  }
+  return null;
+}
+
+function fridayOfISOWeek(date) {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dayNum = d.getUTCDay() || 7;          // 1..7 (Mon..Sun)
+  d.setUTCDate(d.getUTCDate() + (5 - dayNum)); // shift to Friday of same ISO week
+  return d;
+}
+
+async function ensureWeek(date) {
+  const friday = fridayOfISOWeek(date);
+  const weekId = isoWeekId(friday);
+  const dateStr = friday.toISOString().slice(0, 10);
+  if (state.weeks.find(w => w.week_id === weekId)) return weekId;
+  const { error } = await sb.from('weeks').upsert({
+    week_id: weekId,
+    year: friday.getUTCFullYear(),
+    week_number: parseInt(weekId.split('-W')[1]),
+    friday_date: dateStr,
+    created_by: state.user.id,
+  }, { onConflict: 'week_id' });
+  if (error) throw error;
+  await loadWeeks();
+  return weekId;
+}
+
+async function handleUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const kind   = input.dataset.kind;
+  const entity = input.dataset.entity;
+
+  // Use the Snapshot date picker as the source of truth (Clearbooks filenames are date-RANGE not snapshot)
+  const dateStr = document.getElementById('snapshot-date').value;
+  if (!dateStr) { toast('Pick a snapshot date first', 'error'); input.value = ''; return; }
+  let weekId;
+  try { weekId = await ensureWeek(new Date(dateStr)); }
+  catch (e) { toast('Could not create week: ' + e.message, 'error'); return; }
+
+  state.weekId = weekId;
+  const idx = state.weeks.findIndex(w => w.week_id === weekId);
+  state.prevWeekId = state.weeks[idx + 1] ? state.weeks[idx + 1].week_id : null;
+  document.getElementById('week-select').value = weekId;
+  document.getElementById('header-week').textContent = '· ' + weekId;
+  document.getElementById('compare-meta').textContent = state.prevWeekId ? 'vs. ' + state.prevWeekId : '';
+
+  toast('Reading ' + file.name + ' → ' + weekId + '…');
+  try {
+    if (kind === 'sales' || kind === 'purchase') {
+      const rows = await readCSV(file);
+      await ingestClearbooks(kind, entity, rows, weekId);
+      toast(file.name + ' ingested into ' + weekId + ' (' + rows.length + ' rows)', 'ok');
+    } else {
+      toast('Unknown file kind: ' + kind, 'error');
+    }
+    input.value = '';
+    await refreshAll();
+  } catch (e) {
+    console.error(e);
+    toast('Upload failed: ' + e.message, 'error');
+  }
+}
+
+function readCSV(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false });
+        resolve(rows);
+      } catch (e) { reject(e); }
+    };
+    reader.onerror = () => reject(new Error('File read failed'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function parseDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  const s = String(v).trim().replace(/\s+\d{1,2}:\d{2}(:\d{2})?.*$/, '');
+  // Try DD/MM/YYYY
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  // Try DD-Mon-YY
+  m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (m) {
+    const months = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+    const mm = months[m[2]] || 1;
+    const yy = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
+    return `${yy}-${String(mm).padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  }
+  // ISO
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  return null;
+}
+
+async function ingestClearbooks(kind, entity_id, rows, weekIdOverride) {
+  const week_id = weekIdOverride || state.weekId;
+  const table = kind === 'sales' ? 'sales_invoices' : 'purchase_invoices';
+  // Wipe existing snapshot for this week+entity (idempotent reupload)
+  await sb.from(table).delete().eq('week_id', week_id).eq('entity_id', entity_id);
+
+  const mapped = rows.map(r => {
+    const base = {
+      week_id, entity_id,
+      prefix: r.prefix,
+      reference: r.reference,
+      accounting_date: parseDate(r.accounting_date),
+      invoice_date: parseDate(r.invoice_date),
+      invoice_due: parseDate(r.invoice_due),
+      description: r.description,
+      company_name: r.company_name,
+      net: parseFloat(r.net) || 0,
+      vat: parseFloat(r.vat) || 0,
+      gross: parseFloat(r.gross) || 0,
+      outstanding: parseFloat(r.outstanding) || 0,
+      amount_credited: parseFloat(r.amount_credited) || 0,
+      status: r.status,
+      currency_code: r.currency_code || 'GBP',
+      formatted_invoice_number: r.formatted_invoice_number,
+    };
+    if (kind === 'sales') base.clearbooks_invoice_num = r.invoice_num;
+    if (kind === 'purchase') {
+      base.clearbooks_id = parseInt(r.clearbooks_id) || null;
+      base.number = parseInt(r.number) || null;
+      base.po_reference = r.po_reference;
+    }
+    return base;
+  });
+
+  // Batch upsert in chunks of 500
+  const CHUNK = 500;
+  for (let i = 0; i < mapped.length; i += CHUNK) {
+    const chunk = mapped.slice(i, i + CHUNK);
+    const { error } = await sb.from(table).insert(chunk);
+    if (error) throw error;
+  }
+}
+
+
+/* =====================================================================
+ *  UTILS
+ * =================================================================== */
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+/* =====================================================================
+ *  BOOT
+ * =================================================================== */
+trySession();
+</script>
+</body>
+</html>
